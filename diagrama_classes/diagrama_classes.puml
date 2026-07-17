@@ -1,0 +1,231 @@
+@startuml diagrama_classes
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "nucleo" {
+   class ProjetoIoT {
+      -sNome : String
+      -oControlador : Controlador
+      -aComponentes : List<ComponenteHardware>
+      -aConnections : List<Connection>
+      -aRegras : List<Regra>
+      +ProjetoIoT(sNome : String)
+      +controlador(oControlador : Controlador) : ProjetoIoT
+      +componentes(aComponentes : ComponenteHardware...) : ProjetoIoT
+      +conexoes(aConnections : Connection...) : ProjetoIoT
+      +regras(aRegras : Regra...) : ProjetoIoT
+      +build() : ProjetoIoT
+      +getNome() : String
+      +getControlador() : Controlador
+      +getComponentes() : List<ComponenteHardware>
+      +getConnections() : List<Connection>
+      +getRegras() : List<Regra>
+      +pinoDe(sComponente : String) : Optional<Integer>
+   }
+
+   class Principal {
+      -oRegistroDrivers : RegistroDrivers
+      -oConfiguracao : ConfiguracaoFirmware
+      +{static} getInstance() : Principal
+      +registrarDriver(oDriver : Driver) : Principal
+      +getConfiguracao() : ConfiguracaoFirmware
+      +gerarFirmware(oProjeto : ProjetoIoT) : GeradorFirmware
+      +getDiretorioSaida() : Path
+   }
+}
+
+package "hardware" {
+   abstract class ComponenteHardware {
+      -sNome : String
+      -sDriver : String
+      +getNome() : String
+      +getDriver() : String
+      #setDriver(sDriver : String) : void
+   }
+
+   class Controlador {
+      +setPortas(aPortas : Porta...) : Controlador
+      +getPortas() : List<Porta>
+   }
+
+   class Sensor {
+      +setMedicoes(aMedicoes : Medicao...) : Sensor
+      +driver(sDriver : String) : Sensor
+      +getMedicoes() : List<Medicao>
+   }
+
+   class Atuador {
+      +driver(sDriver : String) : Atuador
+   }
+
+   class Porta {
+      +sNome : String
+      +iPino : int
+   }
+
+   class Medicao {
+      +sNome : String
+      +oTipo : TipoValor
+   }
+
+   class Connection {
+      -oComponente : ComponenteHardware
+      -oControlador : Controlador
+      -oPorta : Porta
+      +Connection(oComponente, oControlador, oPorta)
+      +sComponente() : String
+      +sControlador() : String
+      +sPorta() : String
+      +getComponente() : ComponenteHardware
+      +getControlador() : Controlador
+      +getPorta() : Porta
+   }
+
+   enum TipoValor {
+      BOOLEANO
+      INTEIRO
+      DECIMAL
+   }
+}
+
+package "comportamento" {
+   interface Condicao {
+      +toCpp() : String
+      +e(oOutra : Condicao) : Condicao
+      +ou(oOutra : Condicao) : Condicao
+   }
+
+   class CondicaoComparacao {
+      -oSensor : Sensor
+      -oMedicao : Medicao
+      -oOperador : OperadorComparacao
+      -dValor : double
+      +CondicaoComparacao(oSensor, oMedicao, oOperador, dValor)
+   }
+
+   class CondicaoComposta {
+      -oOperador : OperadorLogico
+      -aCondicoes : List<Condicao>
+   }
+
+   interface Acao {
+      +toCpp() : String
+   }
+
+   class AcaoDefinirEstado {
+      -oAtuador : Atuador
+      -bLigado : boolean
+      +AcaoDefinirEstado(oAtuador, bLigado)
+   }
+
+   class AcaoAlternarEstado {
+      -oAtuador : Atuador
+      +AcaoAlternarEstado(oAtuador)
+   }
+
+   class Regra {
+      +{static} quando(oCondicao : Condicao) : Regra
+      +entao(oAcao : Acao) : Regra
+      +e(oAcao : Acao) : Regra
+   }
+
+   enum OperadorComparacao {
+      MENOR
+      MENOR_IGUAL
+      MAIOR
+      MAIOR_IGUAL
+      IGUAL
+      DIFERENTE
+   }
+
+   enum OperadorLogico {
+      E
+      OU
+   }
+}
+
+package "driver" {
+   interface Driver {
+      +chave() : String
+      +codigoGlobal(sComponente : String, iPino : int) : String
+      +codigoSetup(sComponente : String, iPino : int) : String
+      +codigoLeituraLoop(sComponente : String, iPino : int) : String
+   }
+
+   class RegistroDrivers {
+      +registrar(oDriver : Driver) : RegistroDrivers
+      +buscar(sChave : String) : Optional<Driver>
+   }
+}
+
+package "firmware" {
+   class GeradorFirmware {
+      -oRegistro : RegistroDrivers
+      -oConfiguracao : ConfiguracaoFirmware
+      -sCodigoFonte : String
+      +gerar(oProjeto : ProjetoIoT) : GeradorFirmware
+      +getCodigoFonte() : String
+      +salvarProjetoPlatformIo(oDiretorio : Path) : Path
+      +{static} variavelLeitura(sComponente, sMedicao : String) : String
+      +{static} variavelPino(sComponente : String) : String
+      +{static} sanitizar(sNome : String) : String
+   }
+
+   class ConfiguracaoFirmware {
+      -iBaudRate : int
+      -iDelayMs : int
+      -sPlataforma : String
+      -sPlaca : String
+      -aIncludes : List<String>
+      -aLibDeps : List<String>
+      +baudRate(iBaudRate : int) : ConfiguracaoFirmware
+      +delayMs(iDelayMs : int) : ConfiguracaoFirmware
+      +plataforma(sPlataforma : String) : ConfiguracaoFirmware
+      +placa(sPlaca : String) : ConfiguracaoFirmware
+      +addInclude(sInclude : String) : ConfiguracaoFirmware
+      +addLibDep(sLibDep : String) : ConfiguracaoFirmware
+   }
+
+}
+
+ComponenteHardware <|-- Controlador
+ComponenteHardware <|-- Sensor
+ComponenteHardware <|-- Atuador
+
+Condicao <|.. CondicaoComparacao
+Condicao <|.. CondicaoComposta
+Acao <|.. AcaoDefinirEstado
+
+ProjetoIoT "1" *-- "0..*" Connection
+Principal "1" *-- "1" ConfiguracaoFirmware
+Principal "1" *-- "1" RegistroDrivers
+
+ProjetoIoT "1" o-- "1" Controlador
+ProjetoIoT "1" o-- "0..*" ComponenteHardware
+ProjetoIoT "1" o-- "0..*" Regra
+Controlador "1" o-- "0..*" Porta
+Sensor "1" o-- "0..*" Medicao
+Regra "1" o-- "1" Condicao
+Regra "1" o-- "1..*" Acao
+RegistroDrivers "1" o-- "0..*" Driver
+
+Medicao "0..*" o-- "1" TipoValor
+CondicaoComposta "0..*" o-- "1" OperadorLogico
+CondicaoComparacao "0..*" o-- "1" OperadorComparacao
+GeradorFirmware "0..*" o-- "1" RegistroDrivers
+GeradorFirmware "0..*" o-- "1" ConfiguracaoFirmware
+
+GeradorFirmware ..> ProjetoIoT
+Principal ..> GeradorFirmware
+Principal ..> ProjetoIoT
+
+Condicao <|.. AcaoAlternarEstado
+Acao <|.. AcaoAlternarEstado
+Sensor "0..*" o-- "1..*" Medicao
+CondicaoComparacao "0..*" o-- "1" Sensor
+AcaoDefinirEstado "0..*" o-- "1" Atuador
+AcaoAlternarEstado "0..*" o-- "1" Atuador
+Connection "0..*" o-- "1" ComponenteHardware
+Connection "0..*" o-- "1" Controlador
+Connection "0..*" o-- "1" Porta
+@enduml
