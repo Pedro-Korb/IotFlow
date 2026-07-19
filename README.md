@@ -12,44 +12,113 @@ e regras do tipo "quando X então Y") e deixar o `GeradorFirmware` traduzir esse
 o firmware C++ pronto para compilar e subir na placa. Cada condição e ação sabe se traduzir
 para C++ pelo método `toCpp()` — o gerador só percorre o modelo e monta o arquivo.
 
-## Rodando
+## Requisitos
 
-Precisa de Java 17 e Maven.
+- Java 17 ou superior
+- Maven 3.6+
+- PlatformIO (para fazer upload na placa)
 
-```
+## Build
+
+Gerar o JAR do framework:
+
+```bash
 cd framework
-mvn test                -> roda os testes
-mvn compile exec:java   -> roda a demo do semáforo e gera o firmware em ../firmware-output
-mvn compile exec:java -Dexec.mainClass=app.MainSensores   -> roda o exemplo com sensores reais
+mvn clean package
 ```
 
-A demo (`app/Main.java`) modela um semáforo com ESP32 e dois LEDs (D22 e D23) que piscam
-alternados a cada segundo. A saída vai para `firmware-output/semaforo_alternado/` — a pasta
-é derivada do nome do projeto e os arquivos são sobrescritos a cada execução.
+O JAR será criado em `framework/target/iotflow-1.0.0.jar`.
 
-Há também um exemplo com sensores reais (`app/MainSensores.java`): DHT22 (temperatura e
-umidade) e um painel de LEDs de status.
+## Rodando os exemplos
 
-Para subir na placa: `pio run --target upload` dentro da pasta gerada (ex.:
-`firmware-output/monitoramento_de_sensores`) — o PlatformIO baixa as bibliotecas
-declaradas no `lib_deps` sozinho.
+Executar os testes:
+```bash
+cd framework
+mvn test
+```
 
-## Pastas
+Gerar firmware a partir dos exemplos disponíveis:
+```bash
+cd framework
 
-- `framework/` - código do framework e testes JUnit
-- `firmware-output/` - firmware gerado pelos exemplos
+# Semáforo alternado (exemplo simples)
+mvn compile exec:java -Dexec.mainClass=app.main.Main
+
+# Monitoramento com DHT22 (temperatura + umidade)
+mvn compile exec:java -Dexec.mainClass=app.main.MainTemperaturaUmidade
+
+# Potenciômetro (controle contínuo)
+mvn compile exec:java -Dexec.mainClass=app.main.MainPotenciometro
+
+# Potenciômetro com sequenciamento de LEDs
+mvn compile exec:java -Dexec.mainClass=app.main.MainPotenciometroSequencial
+
+# Potenciômetro com seletor de LED
+mvn compile exec:java -Dexec.mainClass=app.main.MainPotenciometroSeletor
+```
+
+Os arquivos C++ gerados ficam em `firmware-output/`. Para subir na placa:
+
+```bash
+cd firmware-output/seu-projeto
+pio run --target upload
+```
+
+O PlatformIO baixa as dependências automaticamente conforme declarado no `platformio.ini`.
+
+## Estrutura do projeto
+
+- `framework/` - código do framework, testes JUnit e exemplos
+- `firmware-output/` - firmware C++ gerado pelos exemplos
 - `diagrama_classes/` - diagrama de classes (PlantUML + SVG)
-- `documentacao/` - javadoc (abrir o index.html no navegador)
 
 ## Design patterns
 
-- Builder + interface fluente: `ProjetoIoT.builder(...)` e `Regra.quando(...).entao(...).e(...)`
-- Composite: condições simples e compostas (E/OU) implementam a mesma interface `Condicao`
-- Singleton: `Principal.getInstance()` — o único ponto de estado global do framework
-- Facade: a classe `Principal` concentra os comportamentos globais do framework
-  (registro de drivers, configuração e geração) num único ponto de entrada
-- Strategy: a interface `Driver` isola o código específico de cada hardware, o núcleo não
-  conhece marca/modelo de nada
+- Fluent Interface: `ProjetoIoT`, `Regra` e `ConfiguracaoFirmware` usam method chaining para configuração declarativa
+- Composite: condições simples (`CondicaoComparacao`) e compostas (`CondicaoComposta`) implementam `Condicao`
+- Singleton: `Principal.getInstance()` fornece acesso único ao ponto de entrada do framework
+- Facade: `Principal` concentra registro de drivers, configuração e geração de firmware
+- Strategy: interface `Driver` permite implementações específicas de sensores e atuadores sem afetar o núcleo
+- Template Method: `GeradorFirmware` define a estrutura do firmware e delega seções ao driver
+
+## Extensibilidade
+
+Para adicionar suporte a novos sensores ou atuadores, implemente a interface `Driver`:
+
+```java
+public class MeuDriver implements Driver {
+    public static final String CHAVE = "meu-driver";
+    
+    @Override
+    public String chave() {
+        return CHAVE;
+    }
+    
+    @Override
+    public String codigoGlobal(String sComponente, int iPino) {
+        // Código global do firmware (variáveis, structs)
+        return "";
+    }
+    
+    @Override
+    public String codigoSetup(String sComponente, int iPino) {
+        // Código da função setup()
+        return String.format("pinMode(%d, OUTPUT);", iPino);
+    }
+    
+    @Override
+    public String codigoLeituraLoop(String sComponente, int iPino) {
+        // Código da função loop()
+        return String.format("digitalWrite(%d, HIGH);", iPino);
+    }
+}
+```
+
+Depois registre no seu projeto:
+
+```java
+Principal.getInstance().registrarDriver(new MeuDriver());
+```
 
 ## Convenções
 

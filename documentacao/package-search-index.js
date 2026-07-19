@@ -1,1 +1,0 @@
-packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"app"},{"l":"iotflow.comportamento"},{"l":"iotflow.driver"},{"l":"iotflow.firmware"},{"l":"iotflow.hardware"},{"l":"iotflow.nucleo"}];updateSearchResults();
